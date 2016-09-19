@@ -5,6 +5,7 @@ var logger = require('morgan');
 var cookieParser = require('cookie-parser');
 var bodyParser = require('body-parser');
 var jokes = require('./model/jokes');
+var session = require('express-session');
 
 
 
@@ -29,11 +30,55 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
+app.use(session({secret:'secret_3162735',saveUninitialized:true, resave: true}));
+
+app.use(function(req, res, next){
+    var sess = req.session;
+    console.log("her er sess: " + sess.userName);
+    console.log("her er url: " + req.url);
+    if(req.url.indexOf("/api/") >= 0)
+    {
+        console.log("we ignore, body: "+ req.body);
+        return next();
+    }
+    if(sess.userName)
+    {
+        console.log("Jeg har usr: " + sess.userName);
+        res.locals.userName = sess.userName;
+        return next();
+    }
+    else
+    {
+        if(req.body.userName)
+        {
+            sess.userName = req.body.userName;
+            res.locals.userName = sess.userName;
+            return res.redirect("/");
+        }
+        else
+        {
+            req.url = "/login";
+            return next();
+        }
+    }
+
+});
+
+
 
 app.use('/', routes);
 app.use('/joke', routes);
 //app.use('/joke', joke);
 app.use('/users', users);
+
+app.post('/api/joke', function(req, res)
+{
+    console.log("i post, her er req.body: " + req.body.joke);
+    jokes.allJokes.push(req.body.joke);
+    res.send("cool beans");
+
+});
+
 
 app.post('/storeJoke', function(req, res)
 {
@@ -43,7 +88,19 @@ app.post('/storeJoke', function(req, res)
     console.log("antal jokes: " + jokes.allJokes.length);
     res.render('pages/postJoke', { title: 'post dine jokes'});
 
+
 });
+
+app.get('/api/joke/random', function(req, res)
+{
+    res.send(jokes.getRandomJoke.toString());
+});
+
+app.get('/api/jokes', function(req, res)
+{
+    res.send(jokes.allJokes.toString());
+});
+
 
 
 // catch 404 and forward to error handler
@@ -52,6 +109,8 @@ app.use(function(req, res, next) {
   err.status = 404;
   next(err);
 });
+
+
 
 // error handlers
 
